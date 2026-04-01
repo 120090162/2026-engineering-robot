@@ -28,8 +28,14 @@ add_executable(rm_servo_cpp_interface src/servo_cpp_interface.cpp)
 target_include_directories(rm_servo_cpp_interface PUBLIC include)
 ament_target_dependencies(rm_servo_cpp_interface moveit_servo rclcpp)
 
+# Add the test keyboard control executable
+add_executable(rm_servo_keyboard_input_test src/servo_keyboard_input_test.cpp)
+target_include_directories(rm_servo_keyboard_input_test PUBLIC include)
+ament_target_dependencies(rm_servo_keyboard_input_test std_msgs control_msgs rclcpp rclcpp_action geometry_msgs sensor_msgs)
+
 install(TARGETS
   rm_servo_cpp_interface
+  rm_servo_keyboard_input_test
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -48,4 +54,5 @@ ament_auto_package(
   INSTALL_TO_SHARE
   launch
   config
+  USE_SCOPED_HEADER_INSTALL_DIR
 )

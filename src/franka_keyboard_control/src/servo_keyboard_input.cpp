@@ -4,27 +4,27 @@
 #include <thread>
 
 // 键盘键位定义
-#define KEYCODE_LEFT   0x44   // 左方向键
-#define KEYCODE_RIGHT  0x43   // 右方向键
-#define KEYCODE_A      0x61   // a
-#define KEYCODE_S      0x73   // s
-#define KEYCODE_D      0x64   // d
-#define KEYCODE_Q      0x71   // q
-#define KEYCODE_W      0x77   // w
-#define KEYCODE_E      0x65   // e
-#define KEYCODE_R      0x72   // r
-#define KEYCODE_F      0x66   // f
-#define KEYCODE_Z      0x7A   // z
-#define KEYCODE_X      0x78   // x
-#define KEYCODE_C      0x63   // c
-#define KEYCODE_SPACE  0x20   // 空格键退出
+#define KEYCODE_LEFT 0x44  // 左方向键
+#define KEYCODE_RIGHT 0x43 // 右方向键
+#define KEYCODE_A 0x61     // a
+#define KEYCODE_S 0x73     // s
+#define KEYCODE_D 0x64     // d
+#define KEYCODE_Q 0x71     // q
+#define KEYCODE_W 0x77     // w
+#define KEYCODE_E 0x65     // e
+#define KEYCODE_R 0x72     // r
+#define KEYCODE_F 0x66     // f
+#define KEYCODE_Z 0x7A     // z
+#define KEYCODE_X 0x78     // x
+#define KEYCODE_C 0x63     // c
+#define KEYCODE_SPACE 0x20 // 空格键退出
 
 namespace ext_serial_driver
 {
     KeyboardServo::KeyboardServo(const rclcpp::NodeOptions &options)
         : Node("keyboard_servo_node", options), port_{new Port(2)}, vel_cmd_(0.2)
     {
-    	print_instructions();
+        // print_instructions();
         RCLCPP_INFO(get_logger(), "Start KeyboardServo!");
         port_->getParams("/dev/ttyACM0", 115200, "none", "none", "1");
 
@@ -57,8 +57,9 @@ namespace ext_serial_driver
         // Heartbeat
         heartbeat_ = HeartBeatPublisher::create(this);
     }
-    
-    void KeyboardServo::print_instructions() {
+
+    void KeyboardServo::print_instructions()
+    {
         puts("\n=== 机械臂键盘控制 ===");
         puts("模式切换:");
         puts("  左方向键: 平移模式");
@@ -131,8 +132,10 @@ namespace ext_serial_driver
         }
     }
 
-    void KeyboardServo::send_home_goal(const std::vector<double>& positions) {
-        if (!action_client_->wait_for_action_server(std::chrono::seconds(2))) {
+    void KeyboardServo::send_home_goal(const std::vector<double> &positions)
+    {
+        if (!action_client_->wait_for_action_server(std::chrono::seconds(2)))
+        {
             RCLCPP_ERROR(get_logger(), "动作服务器不可用");
             return;
         }
@@ -141,31 +144,37 @@ namespace ext_serial_driver
         goal_msg.trajectory.joint_names = {
             "joint0", "joint1", "joint2", "joint3",
             "joint4", "joint5", "joint6"};
-        
+
         trajectory_msgs::msg::JointTrajectoryPoint point;
         point.positions = positions;
         point.time_from_start.sec = 2;
-        
+
         goal_msg.trajectory.points.push_back(point);
-        
+
         auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
         send_goal_options.goal_response_callback =
-            [this](const GoalHandle::SharedPtr & goal_handle) {
-                if (!goal_handle) {
-                    RCLCPP_ERROR(get_logger(), "目标被拒绝");
-                } else {
-                    RCLCPP_INFO(get_logger(), "目标已接受");
-                }
-            };
-        
+            [this](const GoalHandle::SharedPtr &goal_handle)
+        {
+            if (!goal_handle)
+            {
+                RCLCPP_ERROR(get_logger(), "目标被拒绝");
+            }
+            else
+            {
+                RCLCPP_INFO(get_logger(), "目标已接受");
+            }
+        };
+
         action_client_->async_send_goal(goal_msg, send_goal_options);
     }
 
-    void KeyboardServo::process_key(uint8_t c) {
+    void KeyboardServo::process_key(uint8_t c)
+    {
         auto twist_msg = std::make_unique<geometry_msgs::msg::TwistStamped>();
         bool publish_twist = false;
 
-        switch (c) {
+        switch (c)
+        {
         // 模式切换
         case KEYCODE_LEFT:
             current_mode_ = TRANSLATION;
@@ -178,49 +187,67 @@ namespace ext_serial_driver
 
         // 运动控制
         case KEYCODE_W:
-            if (current_mode_ == TRANSLATION) {
+            if (current_mode_ == TRANSLATION)
+            {
                 twist_msg->twist.linear.x = 1.0 * vel_cmd_;
-            } else {
+            }
+            else
+            {
                 twist_msg->twist.angular.y = 1.0 * vel_cmd_;
             }
             publish_twist = true;
             break;
         case KEYCODE_S:
-            if (current_mode_ == TRANSLATION) {
+            if (current_mode_ == TRANSLATION)
+            {
                 twist_msg->twist.linear.x = -1.0 * vel_cmd_;
-            } else {
+            }
+            else
+            {
                 twist_msg->twist.angular.y = -1.0 * vel_cmd_;
             }
             publish_twist = true;
             break;
         case KEYCODE_A:
-            if (current_mode_ == TRANSLATION) {
+            if (current_mode_ == TRANSLATION)
+            {
                 twist_msg->twist.linear.y = -1.0 * vel_cmd_;
-            } else {
+            }
+            else
+            {
                 twist_msg->twist.angular.z = 1.0 * vel_cmd_;
             }
             publish_twist = true;
             break;
         case KEYCODE_D:
-            if (current_mode_ == TRANSLATION) {
+            if (current_mode_ == TRANSLATION)
+            {
                 twist_msg->twist.linear.y = 1.0 * vel_cmd_;
-            } else {
+            }
+            else
+            {
                 twist_msg->twist.angular.z = -1.0 * vel_cmd_;
             }
             publish_twist = true;
             break;
         case KEYCODE_Q:
-            if (current_mode_ == TRANSLATION) {
+            if (current_mode_ == TRANSLATION)
+            {
                 twist_msg->twist.linear.z = 1.0 * vel_cmd_;
-            } else {
+            }
+            else
+            {
                 twist_msg->twist.angular.x = 1.0 * vel_cmd_;
             }
             publish_twist = true;
             break;
         case KEYCODE_E:
-            if (current_mode_ == TRANSLATION) {
+            if (current_mode_ == TRANSLATION)
+            {
                 twist_msg->twist.linear.z = -1.0 * vel_cmd_;
-            } else {
+            }
+            else
+            {
                 twist_msg->twist.angular.x = -1.0 * vel_cmd_;
             }
             publish_twist = true;
@@ -248,53 +275,70 @@ namespace ext_serial_driver
             break;
         case KEYCODE_C:
             RCLCPP_INFO(get_logger(), "兑矿位置");
-            send_home_goal({-0.0006873558818435402, 0.0018702871837408188, -0.15121657114016726, 0.500740208883582, 
+            send_home_goal({-0.0006873558818435402, 0.0018702871837408188, -0.15121657114016726, 0.500740208883582,
                             0.0016983079260446971, -0.7681844522909588, 0.0013878119294897257});
             break;
+        }
 
-        if (publish_twist) {
+        if (publish_twist)
+        {
             twist_msg->header.stamp = now();
             twist_msg->header.frame_id = frame_to_publish_;
             twist_pub_->publish(std::move(twist_msg));
         }
     }
-    }
 
-    void KeyboardServo::sendData(const sensor_msgs::msg::JointState::SharedPtr msg){
-        if (msg->name.size() != msg->position.size()) {
+    void KeyboardServo::sendData(const sensor_msgs::msg::JointState::SharedPtr msg)
+    {
+        if (msg->name.size() != msg->position.size())
+        {
             RCLCPP_ERROR(
-              get_logger(), "JointState message name and position arrays are of different sizes");
+                get_logger(), "JointState message name and position arrays are of different sizes");
             return;
         }
         try
         {
             SendPacket packet;
-            for (size_t i = 0; i < msg->name.size(); ++i) {
-                if (msg->name[i] == "joint0") {
+            for (size_t i = 0; i < msg->name.size(); ++i)
+            {
+                if (msg->name[i] == "joint0")
+                {
                     packet.joint0_state = msg->position[i];
-                } else if (msg->name[i] == "joint1") {
+                }
+                else if (msg->name[i] == "joint1")
+                {
                     packet.joint1_state = msg->position[i];
-                } else if (msg->name[i] == "joint2") {
+                }
+                else if (msg->name[i] == "joint2")
+                {
                     packet.joint2_state = msg->position[i];
-                } else if (msg->name[i] == "joint3") {
+                }
+                else if (msg->name[i] == "joint3")
+                {
                     packet.joint3_state = msg->position[i];
-                } else if (msg->name[i] == "joint4") {
+                }
+                else if (msg->name[i] == "joint4")
+                {
                     packet.joint4_state = msg->position[i];
-                } else if (msg->name[i] == "joint5") {
+                }
+                else if (msg->name[i] == "joint5")
+                {
                     packet.joint5_state = msg->position[i];
-                } else if (msg->name[i] == "joint6") {
+                }
+                else if (msg->name[i] == "joint6")
+                {
                     packet.joint6_state = msg->position[i];
                 }
             }
-  
-              crc16::Append_CRC16_Check_Sum(reinterpret_cast<uint8_t *>(&packet), sizeof(packet));
-              std::vector<uint8_t> data = toVector(packet);
-              port_->serial_driver_->port()->send(data);
+
+            crc16::Append_CRC16_Check_Sum(reinterpret_cast<uint8_t *>(&packet), sizeof(packet));
+            std::vector<uint8_t> data = toVector(packet);
+            port_->serial_driver_->port()->send(data);
         }
         catch (const std::exception &ex)
         {
-              RCLCPP_ERROR(get_logger(), "Error while sending data: %s", ex.what());
-              port_->reopenPort();
+            RCLCPP_ERROR(get_logger(), "Error while sending data: %s", ex.what());
+            port_->reopenPort();
         }
     }
 };
