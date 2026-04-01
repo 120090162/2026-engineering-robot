@@ -13,8 +13,32 @@ ros2 run franka_keyboard_control rm_servo_keyboard_input_test # 键盘控制
 
 ```
 
+一键启动
+```bash
+ros2 launch franka_keyboard_control bringup.launch.py
+```
+
 设置串口权限
 ```bash
 sudo chmod 777 ./script/create_udev_rules.sh
 ./script/create_udev_rules.sh
+```
+
+设置程序自启动与看门狗逻辑, refer to https://github.com/CSU-FYT-Vision/FYT2024_vision
+```bash
+sudo chmod +x ./register_service.sh
+sudo ./register_service.sh
+
+# 正常时有如下输出
+# Creating systemd service file at /etc/systemd/system/rm.service...
+# Reloading systemd daemon...
+# Enabling service rm.service...
+# Starting service rm.service...
+# Service rm.service has been registered and started.
+```
+
+```bash
+systemctl status rm # 查看自启动服务运行情况
+systemctl stop rm # 暂时关闭自启动服务
+systemctl disable rm # 使自启动服务失效
 ```
