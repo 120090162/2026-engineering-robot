@@ -20,6 +20,7 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(rm_moveit_config REQUIRED)
 find_package(robot_arm_simulation REQUIRED)
 ament_auto_find_build_dependencies()
@@ -31,7 +32,7 @@ ament_target_dependencies(rm_servo_cpp_interface moveit_servo rclcpp)
 # Add the test keyboard control executable
 add_executable(rm_servo_keyboard_input_test src/servo_keyboard_input_test.cpp)
 target_include_directories(rm_servo_keyboard_input_test PUBLIC include)
-ament_target_dependencies(rm_servo_keyboard_input_test std_msgs control_msgs rclcpp rclcpp_action geometry_msgs sensor_msgs)
+ament_target_dependencies(rm_servo_keyboard_input_test std_msgs control_msgs rclcpp rclcpp_action geometry_msgs sensor_msgs tf2 tf2_ros tf2_geometry_msgs)
 
 install(TARGETS
   rm_servo_cpp_interface
