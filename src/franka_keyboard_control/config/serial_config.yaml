@@ -1,8 +1,8 @@
-ext_serial_driver:
+keyboard_servo_node:
   ros__parameters:
     device_name: /dev/ttyACM0
     baud_rate: 115200
     flow_control: none
     parity: none
     stop_bits: "1"
-    control_type: "keyboard" # 可选值为 "rc" 或 "keyboard"
+    control_type: "rc" # 可选值为 "rc" 或 "keyboard"

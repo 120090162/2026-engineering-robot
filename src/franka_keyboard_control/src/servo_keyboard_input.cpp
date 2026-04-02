@@ -34,7 +34,7 @@ namespace ext_serial_driver
         std::string parity = this->declare_parameter<std::string>("parity", "none");
         std::string stop_bits = this->declare_parameter<std::string>("stop_bits", "1");
 
-        control_type_ = this->declare_parameter<std::string>("control_type", "keyboard"); // 可选值为 "rc" 或 "keyboard"
+        control_type_ = this->declare_parameter<std::string>("control_type", "rc"); // 可选值为 "rc" 或 "keyboard"
 
         port_->getParams(device_name, baud_rate, flow_control, parity, stop_bits);
 
@@ -375,7 +375,7 @@ namespace ext_serial_driver
             return;
         }
         RCLCPP_INFO(get_logger(), "A级矿模式 - C位置");
-        send_home_goal({0.01404, 0.00492, -0.10805, 0.41800, 0.00005, -1.26433, 0.64947});
+        send_home_goal({0.01404, 0.00492, -0.10805, 0.41800, 0.00005, -1.26433, 0.0});
     }
 
     // ========== B 级矿模式 ==========
@@ -387,7 +387,7 @@ namespace ext_serial_driver
             return;
         }
         RCLCPP_INFO(get_logger(), "B级矿模式 - X位置");
-        send_home_goal({0.53600, 0.96518, -0.22727, 0.64461, 0.26468, 1.02392, -0.21919}); // 占位
+        send_home_goal({-0.21268, -0.07098, -0.40943, 0.25760, 0.79241, -0.90865, 0.0}); // 占位
     }
 
     void KeyboardServo::send_to_position_A_Base()
@@ -398,7 +398,7 @@ namespace ext_serial_driver
             return;
         }
         RCLCPP_INFO(get_logger(), "进入A级矿模式，移动到预设A基础位置");
-        send_home_goal({0.01453, 0.00125, -0.17905, 0.28518, 0.00125, 0.10357, 1.68631});
+        send_home_goal({-0.05019, -0.23415, -0.18676, 0.29139, 1.05630, 0.21091, 0.0});
     }
 
     void KeyboardServo::send_to_position_B_Base()
@@ -409,7 +409,7 @@ namespace ext_serial_driver
             return;
         }
         RCLCPP_INFO(get_logger(), "进入B级矿模式，移动到预设B基础位置");
-        send_home_goal({0.01316, 0.01038, -0.28587, 0.82598, 0.00545, 0.53621, 0.63569});
+        send_home_goal({0.01316, 0.01038, -0.28587, 0.82598, 0.00545, 0.53621, 0.0});
     }
 
     void KeyboardServo::process_key(char c)
@@ -555,7 +555,7 @@ namespace ext_serial_driver
                 break;
             }
             RCLCPP_INFO(get_logger(), "开车位置");
-            send_home_goal({0.0, 0.0, -0.24033, 0.10848, 0.0, 0.0, 0.64036});
+            send_home_goal({0.0, 0.0, -0.24033, 0.10848, 0.0, 0.0, 0.0});
             break;
 
         case KEYCODE_X:
