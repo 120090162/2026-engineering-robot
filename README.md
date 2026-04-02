@@ -27,6 +27,8 @@ sudo chmod 777 ./script/create_udev_rules.sh
 
 设置程序自启动与看门狗逻辑, refer to https://github.com/CSU-FYT-Vision/FYT2024_vision
 ```bash
+touch screen.output
+cd src/rm_upstart
 sudo chmod +x ./register_service.sh
 sudo ./register_service.sh
 
