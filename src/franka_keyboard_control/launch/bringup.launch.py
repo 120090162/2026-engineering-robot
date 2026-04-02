@@ -20,6 +20,18 @@ def generate_launch_description():
     bringup_dir = get_package_share_directory("franka_keyboard_control")
 
     use_respawn = LaunchConfiguration("use_respawn")
+    params_file = LaunchConfiguration("params_file")
+
+    # Create our own temporary YAML files that include substitutions
+    configured_params = ParameterFile(
+        RewrittenYaml(
+            source_file=params_file,
+            root_key="",
+            param_rewrites={},
+            convert_types=True,
+        ),
+        allow_substs=True,
+    )
 
     stdout_linebuf_envvar = SetEnvironmentVariable(
         "RCUTILS_LOGGING_BUFFERED_STREAM", "1"
@@ -33,6 +45,16 @@ def generate_launch_description():
         description="Whether to respawn if a node crashes. Applied when composition is disabled.",
     )
 
+    declare_params_file_cmd = DeclareLaunchArgument(
+        "params_file",
+        default_value=os.path.join(
+            bringup_dir,
+            "config",
+            "serial_config.yaml",
+        ),
+        description="Full path to the ROS2 parameters file to use for serial nodes",
+    )
+
     # Specify the actions
     start_franka_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -42,13 +64,14 @@ def generate_launch_description():
         ),
     )
 
-    record_rosbag_cmd = Node(
+    serial_cmd = Node(
         package="franka_keyboard_control",
         executable="keyboard_servo_node",
         name="keyboard_servo_node",
         output="screen",
         respawn=use_respawn,
         respawn_delay=2.0,
+        parameters=[configured_params],
     )
 
     # Create the launch description and populate
@@ -59,9 +82,10 @@ def generate_launch_description():
     ld.add_action(colorized_output_envvar)
 
     ld.add_action(declare_use_respawn_cmd)
+    ld.add_action(declare_params_file_cmd)
 
     # Add the actions to launch all of the navigation nodes
     ld.add_action(start_franka_cmd)
-    ld.add_action(record_rosbag_cmd)
+    ld.add_action(serial_cmd)
 
     return ld

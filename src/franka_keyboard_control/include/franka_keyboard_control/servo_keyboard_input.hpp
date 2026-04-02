@@ -34,6 +34,37 @@ using GoalHandle = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
 
 namespace ext_serial_driver
 {
+    class KeyboardReader
+    {
+    public:
+        KeyboardReader() : kfd(0)
+        {
+            tcgetattr(kfd, &cooked);
+            struct termios raw;
+            memcpy(&raw, &cooked, sizeof(struct termios));
+            raw.c_lflag &= ~(ICANON | ECHO);
+            raw.c_cc[VEOL] = 1;
+            raw.c_cc[VEOF] = 2;
+            tcsetattr(kfd, TCSANOW, &raw);
+        }
+
+        void readOne(char *c)
+        {
+            int rc = read(kfd, c, 1);
+            if (rc < 0)
+                throw std::runtime_error("read failed");
+        }
+
+        void shutdown()
+        {
+            tcsetattr(kfd, TCSANOW, &cooked);
+        }
+
+    private:
+        int kfd;
+        struct termios cooked;
+    };
+
     class KeyboardServo : public rclcpp::Node
     {
     public:
@@ -46,6 +77,7 @@ namespace ext_serial_driver
         std::string BASE_FRAME_ID = "base_link";
 
         explicit KeyboardServo(const rclcpp::NodeOptions &options);
+        ~KeyboardServo() override;
 
     private:
         enum ControlMode
@@ -70,6 +102,10 @@ namespace ext_serial_driver
         rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
         rclcpp_action::Client<FollowJointTrajectory>::SharedPtr action_client_;
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_sub_;
+
+        // 键盘输入线程
+        std::string control_type_;
+        std::thread keyboard_thread_;
 
         std::mutex joint_state_mutex_;
         std::vector<double> current_joint_positions_;
@@ -99,8 +135,10 @@ namespace ext_serial_driver
         void send_to_position_B_Base();
         void print_instructions();
         void process_key(char c);
+        void keyboardLoop();
         void receiveData();
         void sendData(const sensor_msgs::msg::JointState::SharedPtr msg);
+        void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
     };
 }
 

@@ -7,7 +7,7 @@ colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release --paralle
 source install/setup.bash # zsh
 ros2 launch franka_keyboard_control franka_interface.launch.py
 sudo chmod 777 /dev/ttyACM0
-ros2 run franka_keyboard_control keyboard_servo_node # rc 控制
+ros2 run franka_keyboard_control keyboard_servo_node # rc 控制 / 键盘控制
 # or
 ros2 run franka_keyboard_control rm_servo_keyboard_input_test # 键盘控制
 
@@ -15,6 +15,7 @@ ros2 run franka_keyboard_control rm_servo_keyboard_input_test # 键盘控制
 
 一键启动
 ```bash
+# note: 如果要用键盘控制，不能使用这个方案
 ros2 launch franka_keyboard_control bringup.launch.py
 ```
 

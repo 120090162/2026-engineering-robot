@@ -16,8 +16,8 @@
 #define KEYCODE_C 0x63
 #define KEYCODE_V 0x76
 #define KEYCODE_B 0x62
-#define KEYCODE_T 0x74
-#define KEYCODE_Y 0x79
+#define KEYCODE_T 0x74 // 对应 shift
+#define KEYCODE_Y 0x79 // 对应 ctrl
 #define KEYCODE_SPACE 0x20
 
 namespace ext_serial_driver
@@ -27,40 +27,73 @@ namespace ext_serial_driver
     {
         // print_instructions();
         RCLCPP_INFO(get_logger(), "Start KeyboardServo!");
-        port_->getParams("/dev/ttyACM0", 115200, "none", "none", "1");
+
+        std::string device_name = this->declare_parameter<std::string>("device_name", "/dev/ttyACM0");
+        uint32_t baud_rate = this->declare_parameter<int>("baud_rate", 115200);
+        std::string flow_control = this->declare_parameter<std::string>("flow_control", "none");
+        std::string parity = this->declare_parameter<std::string>("parity", "none");
+        std::string stop_bits = this->declare_parameter<std::string>("stop_bits", "1");
+
+        control_type_ = this->declare_parameter<std::string>("control_type", "keyboard"); // 可选值为 "rc" 或 "keyboard"
+
+        port_->getParams(device_name, baud_rate, flow_control, parity, stop_bits);
 
         twist_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>(TWIST_TOPIC, ROS_QUEUE_SIZE);
         action_client_ = rclcpp_action::create_client<FollowJointTrajectory>(
             this,
             "/manipulator_controller/follow_joint_trajectory");
-
-        try
+        if (control_type_ == "rc")
         {
-            port_->serial_driver_->init_port(port_->device_name_, *port_->device_config_);
-            if (!port_->serial_driver_->port()->is_open())
+            try
             {
-                port_->serial_driver_->port()->open();
-                port_->receive_thread_ = std::thread(&KeyboardServo::receiveData, this);
-                // LOG
-                RCLCPP_INFO(get_logger(), "serial open OK!");
-            }
-        }
-        catch (const std::exception &ex)
-        {
-            RCLCPP_ERROR(
-                get_logger(), "Error creating serial port: %s - %s", port_->device_name_.c_str(), ex.what());
-            throw ex;
-        }
+                port_->serial_driver_->init_port(port_->device_name_, *port_->device_config_);
+                if (!port_->serial_driver_->port()->is_open())
+                {
+                    port_->serial_driver_->port()->open();
+                    port_->receive_thread_ = std::thread(&KeyboardServo::receiveData, this);
 
-        joint_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
-            JOINT_STATE_TOPIC, ROS_QUEUE_SIZE,
-            std::bind(&KeyboardServo::sendData, this, std::placeholders::_1));
+                    // LOG
+                    RCLCPP_INFO(get_logger(), "serial open OK!");
+                }
+            }
+            catch (const std::exception &ex)
+            {
+                RCLCPP_ERROR(
+                    get_logger(), "Error creating serial port: %s - %s", port_->device_name_.c_str(), ex.what());
+                throw ex;
+            }
+
+            joint_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
+                JOINT_STATE_TOPIC, ROS_QUEUE_SIZE,
+                std::bind(&KeyboardServo::sendData, this, std::placeholders::_1));
+        }
+        else if (control_type_ == "keyboard")
+        {
+            keyboard_thread_ = std::thread(&KeyboardServo::keyboardLoop, this);
+
+            joint_sub_ = create_subscription<sensor_msgs::msg::JointState>(
+                JOINT_STATE_TOPIC, ROS_QUEUE_SIZE,
+                std::bind(&KeyboardServo::jointStateCallback, this, std::placeholders::_1));
+        }
+        else
+        {
+            RCLCPP_ERROR(get_logger(), "Invalid control_type parameter: %s. Must be 'rc' or 'keyboard'.", control_type_.c_str());
+            throw std::runtime_error("Invalid control_type parameter");
+        }
 
         init_b_grade_rotation();
         publish_b_grade_tf();
 
         // Heartbeat
         heartbeat_ = HeartBeatPublisher::create(this);
+    }
+
+    KeyboardServo::~KeyboardServo()
+    {
+        if (keyboard_thread_.joinable())
+        {
+            keyboard_thread_.join();
+        }
     }
 
     void KeyboardServo::print_instructions()
@@ -98,6 +131,36 @@ namespace ext_serial_driver
         puts("  关节锁死状态: [按B键锁死，按V键解锁]");
         puts("  当前矿模式: 无 / A级 / B级");
         puts("  B级矿坐标系启用状态: 仅 B 级矿模式下可启用, 按C键切换, R/F/切换模式自动禁用");
+    }
+
+    void KeyboardServo::keyboardLoop()
+    {
+        char c;
+        KeyboardReader input;
+        print_instructions();
+
+        while (rclcpp::ok())
+        {
+            try
+            {
+                input.readOne(&c);
+            }
+            catch (const std::runtime_error &e)
+            {
+                RCLCPP_ERROR(get_logger(), "读取键盘输入失败: %s", e.what());
+                break;
+            }
+            process_key(c);
+
+            if (c == KEYCODE_SPACE)
+            {
+                RCLCPP_INFO(get_logger(), "退出程序");
+                rclcpp::shutdown();
+                break;
+            }
+        }
+
+        input.shutdown();
     }
 
     void KeyboardServo::receiveData()
@@ -555,9 +618,12 @@ namespace ext_serial_driver
             break;
 
         case KEYCODE_B:
-            if (!is_joint_locked_) {
+            if (!is_joint_locked_)
+            {
                 lockCurrentJoints();
-            } else {
+            }
+            else
+            {
                 RCLCPP_INFO(get_logger(), "关节已处于锁死状态，请勿重复操作");
             }
             break;
@@ -673,6 +739,33 @@ namespace ext_serial_driver
         current_joint_positions_ = ordered_positions;
         has_joint_state_ = true;
     }
+
+    void KeyboardServo::jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
+    {
+        std::lock_guard<std::mutex> lock(joint_state_mutex_);
+        current_joint_positions_ = msg->position;
+
+        std::vector<std::string> target_joints = {
+            "joint0", "joint1", "joint2", "joint3",
+            "joint4", "joint5", "joint6"};
+
+        std::vector<double> ordered_positions(target_joints.size(), 0.0);
+        for (size_t i = 0; i < target_joints.size(); ++i)
+        {
+            for (size_t j = 0; j < msg->name.size(); ++j)
+            {
+                if (msg->name[j] == target_joints[i])
+                {
+                    ordered_positions[i] = msg->position[j];
+                    break;
+                }
+            }
+        }
+
+        current_joint_positions_ = ordered_positions;
+        has_joint_state_ = true;
+    }
+
 };
 
 #include "rclcpp_components/register_node_macro.hpp"
