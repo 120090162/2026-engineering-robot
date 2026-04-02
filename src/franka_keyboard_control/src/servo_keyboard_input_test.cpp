@@ -19,24 +19,24 @@
 #include <cmath>
 
 // 键盘键位定义
-#define KEYCODE_LEFT 0x44
-#define KEYCODE_RIGHT 0x43
-#define KEYCODE_A 0x61
-#define KEYCODE_S 0x73
-#define KEYCODE_D 0x64
-#define KEYCODE_Q 0x71
-#define KEYCODE_W 0x77
-#define KEYCODE_E 0x65
-#define KEYCODE_R 0x72
-#define KEYCODE_F 0x66
-#define KEYCODE_Z 0x7A
-#define KEYCODE_X 0x78
-#define KEYCODE_C 0x63
-#define KEYCODE_V 0x76
-#define KEYCODE_B 0x62
-#define KEYCODE_T 0x74
-#define KEYCODE_Y 0x79
-#define KEYCODE_SPACE 0x20
+#define KEYCODE_LEFT   0x44
+#define KEYCODE_RIGHT  0x43
+#define KEYCODE_A      0x61
+#define KEYCODE_S      0x73
+#define KEYCODE_D      0x64
+#define KEYCODE_Q      0x71
+#define KEYCODE_W      0x77
+#define KEYCODE_E      0x65
+#define KEYCODE_R      0x72
+#define KEYCODE_F      0x66
+#define KEYCODE_Z      0x7A
+#define KEYCODE_X      0x78
+#define KEYCODE_C      0x63
+#define KEYCODE_V      0x76
+#define KEYCODE_B      0x62
+#define KEYCODE_T      0x74
+#define KEYCODE_Y      0x79
+#define KEYCODE_SPACE  0x20
 
 // 话题和帧配置
 const std::string TWIST_TOPIC = "/servo_demo_node/delta_twist_cmds";
@@ -48,11 +48,9 @@ const std::string BASE_FRAME_ID = "base_link";
 using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
 using GoalHandle = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
 
-class KeyboardReader
-{
+class KeyboardReader {
 public:
-    KeyboardReader() : kfd(0)
-    {
+    KeyboardReader() : kfd(0) {
         tcgetattr(kfd, &cooked);
         struct termios raw;
         memcpy(&raw, &cooked, sizeof(struct termios));
@@ -62,15 +60,12 @@ public:
         tcsetattr(kfd, TCSANOW, &raw);
     }
 
-    void readOne(char *c)
-    {
+    void readOne(char *c) {
         int rc = read(kfd, c, 1);
-        if (rc < 0)
-            throw std::runtime_error("read failed");
+        if (rc < 0) throw std::runtime_error("read failed");
     }
 
-    void shutdown()
-    {
+    void shutdown() {
         tcsetattr(kfd, TCSANOW, &cooked);
     }
 
@@ -79,16 +74,14 @@ private:
     struct termios cooked;
 };
 
-class KeyboardServo : public rclcpp::Node
-{
+class KeyboardServo : public rclcpp::Node {
 public:
     KeyboardServo() : Node("keyboard_servo_node"),
                       current_mode_(ControlMode::TRANSLATION),
                       current_special_mode_(SpecialMode::NONE),
                       is_joint_locked_(false),
                       vel_cmd_(0.2),
-                      use_b_grade_frame_(false)
-    {
+                      use_b_grade_frame_(false) {
         twist_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>(TWIST_TOPIC, ROS_QUEUE_SIZE);
         action_client_ = rclcpp_action::create_client<FollowJointTrajectory>(
             this, "/manipulator_controller/follow_joint_trajectory");
@@ -100,8 +93,7 @@ public:
         publish_b_grade_tf();
     }
 
-    void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
-    {
+    void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(joint_state_mutex_);
         current_joint_positions_ = msg->position;
 
@@ -110,12 +102,9 @@ public:
             "joint4", "joint5", "joint6"};
 
         std::vector<double> ordered_positions(target_joints.size(), 0.0);
-        for (size_t i = 0; i < target_joints.size(); ++i)
-        {
-            for (size_t j = 0; j < msg->name.size(); ++j)
-            {
-                if (msg->name[j] == target_joints[i])
-                {
+        for (size_t i = 0; i < target_joints.size(); ++i) {
+            for (size_t j = 0; j < msg->name.size(); ++j) {
+                if (msg->name[j] == target_joints[i]) {
                     ordered_positions[i] = msg->position[j];
                     break;
                 }
@@ -126,10 +115,8 @@ public:
         has_joint_state_ = true;
     }
 
-    void send_home_goal(const std::vector<double> &positions)
-    {
-        if (!action_client_->wait_for_action_server(std::chrono::seconds(2)))
-        {
+    void send_home_goal(const std::vector<double>& positions) {
+        if (!action_client_->wait_for_action_server(std::chrono::seconds(2))) {
             RCLCPP_ERROR(get_logger(), "动作服务器不可用");
             return;
         }
@@ -146,33 +133,26 @@ public:
 
         auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
         send_goal_options.goal_response_callback =
-            [this](const GoalHandle::SharedPtr &goal_handle)
-        {
-            if (!goal_handle)
-            {
-                RCLCPP_ERROR(get_logger(), "目标被拒绝");
-            }
-            else
-            {
-                RCLCPP_INFO(get_logger(), "目标已接受");
-            }
-        };
+            [this](const GoalHandle::SharedPtr & goal_handle) {
+                if (!goal_handle) {
+                    RCLCPP_ERROR(get_logger(), "目标被拒绝");
+                } else {
+                    RCLCPP_INFO(get_logger(), "目标已接受");
+                }
+            };
 
         action_client_->async_send_goal(goal_msg, send_goal_options);
     }
 
-    void lockCurrentJoints()
-    {
+    void lockCurrentJoints() {
         std::lock_guard<std::mutex> lock(joint_state_mutex_);
-        if (!has_joint_state_)
-        {
+        if (!has_joint_state_) {
             RCLCPP_WARN(get_logger(), "尚未收到关节状态，无法锁死");
             return;
         }
 
         RCLCPP_INFO(get_logger(), "锁死当前关节角度");
-        if (!action_client_->wait_for_action_server(std::chrono::seconds(2)))
-        {
+        if (!action_client_->wait_for_action_server(std::chrono::seconds(2))) {
             RCLCPP_ERROR(get_logger(), "动作服务器不可用");
             return;
         }
@@ -189,44 +169,33 @@ public:
 
         auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
         send_goal_options.goal_response_callback =
-            [this](const GoalHandle::SharedPtr &goal_handle)
-        {
-            if (!goal_handle)
-            {
-                RCLCPP_ERROR(get_logger(), "锁死目标被拒绝");
-            }
-            else
-            {
-                RCLCPP_INFO(get_logger(), "关节已锁死");
-            }
-        };
+            [this](const GoalHandle::SharedPtr & goal_handle) {
+                if (!goal_handle) {
+                    RCLCPP_ERROR(get_logger(), "锁死目标被拒绝");
+                } else {
+                    RCLCPP_INFO(get_logger(), "关节已锁死");
+                }
+            };
 
         action_client_->async_send_goal(goal_msg, send_goal_options);
         is_joint_locked_ = true;
     }
 
-    void unlockJoints()
-    {
+    void unlockJoints() {
         is_joint_locked_ = false;
         RCLCPP_INFO(get_logger(), "关节已解锁");
     }
 
-    void keyLoop()
-    {
+    void keyLoop() {
         char c;
         KeyboardReader input;
-        std::thread spin_thread([this]()
-                                { rclcpp::spin(shared_from_this()); });
+        std::thread spin_thread([this]() { rclcpp::spin(shared_from_this()); });
         print_instructions();
 
-        while (rclcpp::ok())
-        {
-            try
-            {
+        while (rclcpp::ok()) {
+            try {
                 input.readOne(&c);
-            }
-            catch (const std::runtime_error &e)
-            {
+            } catch (const std::runtime_error & e) {
                 RCLCPP_ERROR(get_logger(), "读取键盘输入失败: %s", e.what());
                 break;
             }
@@ -238,17 +207,8 @@ public:
     }
 
 private:
-    enum class ControlMode
-    {
-        TRANSLATION,
-        ROTATION
-    };
-    enum class SpecialMode
-    {
-        NONE,
-        A_MODE,
-        B_MODE
-    };
+    enum class ControlMode { TRANSLATION, ROTATION };
+    enum class SpecialMode { NONE, A_MODE, B_MODE };
 
     ControlMode current_mode_;
     SpecialMode current_special_mode_;
@@ -265,37 +225,28 @@ private:
     std::string frame_to_publish_ = BASE_FRAME_ID;
     double vel_cmd_;
     bool use_b_grade_frame_;
-    tf2::Quaternion b_grade_rotation_; // 从 b_grade_frame 到 base_link 的旋转
+    tf2::Quaternion b_grade_rotation_;   // 从 b_grade_frame 到 base_link 的旋转
 
-    // 修改：旋转顺序为 先绕 Y +30°，再绕旋转后的 X +27°
-    void init_b_grade_rotation()
-    {
-        // 先绕 Y 轴旋转 +30°
+    // ========== B 级矿坐标系初始化 ==========
+    // 理论基础：外旋（绕固定基坐标轴旋转）遵循左乘原则
+    void init_b_grade_rotation() {
+        // 1. 绕固定基座 Y 轴旋转 +50°
         tf2::Quaternion q_y;
-        q_y.setRPY(0, 30.0 * M_PI / 180.0, 0);
-        tf2::Transform t_y(q_y, tf2::Vector3(0, 0, 0));
+        q_y.setRPY(0, 50.0 * M_PI / 180.0, 0);
 
-        // 新 X 轴方向（在 base_link 中），即旋转后的 X 轴
-        tf2::Vector3 new_x = t_y * tf2::Vector3(1, 0, 0);
-        new_x.normalize();
+        // 2. 绕固定基座 X 轴（旋转前的 X 轴）旋转 +45°
+        tf2::Quaternion q_x;
+        q_x.setRPY(45.0 * M_PI / 180.0, 0, 0);
 
-        // 绕新 X 轴旋转 +27° 的四元数
-        double angle = 27.0 * M_PI / 180.0;
-        tf2::Quaternion q_local_axis;
-        q_local_axis.setRotation(new_x, angle);
-        q_local_axis.normalize();
-
-        // 总旋转四元数 base_link -> b_grade_frame
-        tf2::Quaternion q_base_to_b = q_y * q_local_axis; // 先应用 q_y，再应用 q_local_axis
+        // 3. 计算合成四元数：外旋左乘
+        tf2::Quaternion q_base_to_b = q_x * q_y;
         q_base_to_b.normalize();
 
-        // 存储逆旋转（b_grade_frame -> base_link）
-        b_grade_rotation_ = q_base_to_b.inverse();
+        // 存储旋转矩阵（b_grade_frame -> base_link）
+        b_grade_rotation_ = q_base_to_b;
     }
 
-    // 修改：发布 TF 时使用相同的旋转
-    void publish_b_grade_tf()
-    {
+    void publish_b_grade_tf() {
         static tf2_ros::StaticTransformBroadcaster broadcaster(this);
         geometry_msgs::msg::TransformStamped transform;
 
@@ -303,16 +254,12 @@ private:
         transform.header.frame_id = BASE_FRAME_ID;
         transform.child_frame_id = "b_grade_frame";
 
-        // 重新计算 q_base_to_b 用于 TF 发布
+        // 重新计算 q_base_to_b 用于 TF 静态广播
         tf2::Quaternion q_y;
-        q_y.setRPY(0, 30.0 * M_PI / 180.0, 0);
-        tf2::Transform t_y(q_y, tf2::Vector3(0, 0, 0));
-        tf2::Vector3 new_x = t_y * tf2::Vector3(1, 0, 0);
-        new_x.normalize();
-        double angle = 27.0 * M_PI / 180.0;
-        tf2::Quaternion q_local_axis;
-        q_local_axis.setRotation(new_x, angle);
-        tf2::Quaternion q_base_to_b = q_y * q_local_axis;
+        q_y.setRPY(0, 50.0 * M_PI / 180.0, 0);
+        tf2::Quaternion q_x;
+        q_x.setRPY(45.0 * M_PI / 180.0, 0, 0);
+        tf2::Quaternion q_base_to_b = q_x * q_y;
         q_base_to_b.normalize();
 
         transform.transform.rotation.x = q_base_to_b.x();
@@ -325,14 +272,12 @@ private:
         transform.transform.translation.z = 0.0;
 
         broadcaster.sendTransform(transform);
-        RCLCPP_INFO(get_logger(), "已发布 B 级矿坐标系静态变换 (先绕 Y +30°，再绕新 X +27°)");
+        RCLCPP_INFO(get_logger(), "已发布 B 级矿坐标系静态变换 (外旋: 先绕基座 Y +50°, 再绕基座 X +45°)");
     }
 
     // ========== A 级矿模式 ==========
-    void send_to_position_A_X()
-    {
-        if (is_joint_locked_)
-        {
+    void send_to_position_A_X() {
+        if (is_joint_locked_) {
             RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
             return;
         }
@@ -348,10 +293,8 @@ private:
         twist_pub_->publish(std::move(twist_msg));
     }
 
-    void send_to_position_A_C()
-    {
-        if (is_joint_locked_)
-        {
+    void send_to_position_A_C() {
+        if (is_joint_locked_) {
             RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
             return;
         }
@@ -360,21 +303,17 @@ private:
     }
 
     // ========== B 级矿模式 ==========
-    void send_to_position_B_X()
-    {
-        if (is_joint_locked_)
-        {
+    void send_to_position_B_X() {
+        if (is_joint_locked_) {
             RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
             return;
         }
         RCLCPP_INFO(get_logger(), "B级矿模式 - X位置");
-        send_home_goal({0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0}); // 占位
+        send_home_goal({0.53600, 0.96518, -0.22727, 0.64461, 0.26468, 1.02392, -0.21919}); // 占位
     }
 
-    void send_to_position_A_Base()
-    {
-        if (is_joint_locked_)
-        {
+    void send_to_position_A_Base() {
+        if (is_joint_locked_) {
             RCLCPP_WARN(get_logger(), "关节已锁死，无法进入A级矿模式");
             return;
         }
@@ -382,10 +321,8 @@ private:
         send_home_goal({0.01453, 0.00125, -0.17905, 0.28518, 0.00125, 0.10357, 1.68631});
     }
 
-    void send_to_position_B_Base()
-    {
-        if (is_joint_locked_)
-        {
+    void send_to_position_B_Base() {
+        if (is_joint_locked_) {
             RCLCPP_WARN(get_logger(), "关节已锁死，无法进入B级矿模式");
             return;
         }
@@ -393,8 +330,7 @@ private:
         send_home_goal({0.01316, 0.01038, -0.28587, 0.82598, 0.00545, 0.53621, 0.63569});
     }
 
-    void print_instructions()
-    {
+    void print_instructions() {
         puts("\n=== 机械臂键盘控制 ===");
         puts("模式切换:");
         puts("  左方向键: 平移模式");
@@ -420,7 +356,7 @@ private:
         puts("  C - A级矿兑换位置");
         puts("\nB级矿模式下:");
         puts("  X - 位置1");
-        puts("  C - 启用 B 级矿坐标系 (先绕 Y +30°，再绕新 X +27°)");
+        puts("  C - 启用 B 级矿坐标系 (先绕基座 Y +50°，再绕基座 X +45°)");
         puts("  按 R 或 F 可禁用 B 级矿坐标系，恢复正常控制");
         puts("\n非矿模式下 X/C/V 无效");
         puts("\n状态指示:");
@@ -429,14 +365,12 @@ private:
         puts("  B级矿坐标系启用状态: 仅 B 级矿模式下可启用, 按C键切换, R/F/切换模式自动禁用");
     }
 
-    void process_key(char c)
-    {
+    void process_key(char c) {
         auto twist_msg = std::make_unique<geometry_msgs::msg::TwistStamped>();
         bool publish_twist = false;
         unsigned char key = static_cast<unsigned char>(c);
 
-        switch (key)
-        {
+        switch (key) {
         case KEYCODE_LEFT:
             current_mode_ = ControlMode::TRANSLATION;
             RCLCPP_INFO(get_logger(), "切换到平移模式");
@@ -448,8 +382,7 @@ private:
 
         // 运动控制
         case KEYCODE_W:
-            if (is_joint_locked_)
-            {
+            if (is_joint_locked_) {
                 RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
                 break;
             }
@@ -460,8 +393,7 @@ private:
             publish_twist = true;
             break;
         case KEYCODE_S:
-            if (is_joint_locked_)
-            {
+            if (is_joint_locked_) {
                 RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
                 break;
             }
@@ -472,8 +404,7 @@ private:
             publish_twist = true;
             break;
         case KEYCODE_A:
-            if (is_joint_locked_)
-            {
+            if (is_joint_locked_) {
                 RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
                 break;
             }
@@ -484,8 +415,7 @@ private:
             publish_twist = true;
             break;
         case KEYCODE_D:
-            if (is_joint_locked_)
-            {
+            if (is_joint_locked_) {
                 RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
                 break;
             }
@@ -496,8 +426,7 @@ private:
             publish_twist = true;
             break;
         case KEYCODE_Q:
-            if (is_joint_locked_)
-            {
+            if (is_joint_locked_) {
                 RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
                 break;
             }
@@ -508,8 +437,7 @@ private:
             publish_twist = true;
             break;
         case KEYCODE_E:
-            if (is_joint_locked_)
-            {
+            if (is_joint_locked_) {
                 RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
                 break;
             }
@@ -534,40 +462,32 @@ private:
 
         // 进入模式
         case KEYCODE_T:
-            if (current_special_mode_ != SpecialMode::A_MODE)
-            {
+            if (current_special_mode_ != SpecialMode::A_MODE) {
                 current_special_mode_ = SpecialMode::A_MODE;
-                use_b_grade_frame_ = false; // 离开 B 模式，禁用坐标系
+                use_b_grade_frame_ = false;   // 离开 B 模式，禁用坐标系
                 send_to_position_A_Base();
-            }
-            else
-            {
+            } else {
                 RCLCPP_INFO(get_logger(), "已处于A级矿模式，重新移动到A基础位置");
                 send_to_position_A_Base();
             }
             break;
         case KEYCODE_Y:
-            if (current_special_mode_ != SpecialMode::B_MODE)
-            {
+            if (current_special_mode_ != SpecialMode::B_MODE) {
                 current_special_mode_ = SpecialMode::B_MODE;
                 send_to_position_B_Base();
-            }
-            else
-            {
+            } else {
                 RCLCPP_INFO(get_logger(), "已处于B级矿模式，重新移动到B基础位置");
                 send_to_position_B_Base();
             }
             break;
 
         case KEYCODE_Z:
-            if (current_special_mode_ != SpecialMode::NONE)
-            {
+            if (current_special_mode_ != SpecialMode::NONE) {
                 current_special_mode_ = SpecialMode::NONE;
                 use_b_grade_frame_ = false;
                 RCLCPP_INFO(get_logger(), "已退出矿模式，返回普通操作");
             }
-            if (is_joint_locked_)
-            {
+            if (is_joint_locked_) {
                 RCLCPP_WARN(get_logger(), "关节已锁死，无法执行开车位置");
                 break;
             }
@@ -576,49 +496,34 @@ private:
             break;
 
         case KEYCODE_X:
-            if (is_joint_locked_)
-            {
+            if (is_joint_locked_) {
                 RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
                 break;
             }
-            if (current_special_mode_ == SpecialMode::A_MODE)
-            {
+            if (current_special_mode_ == SpecialMode::A_MODE) {
                 send_to_position_A_X();
-            }
-            else if (current_special_mode_ == SpecialMode::B_MODE)
-            {
+            } else if (current_special_mode_ == SpecialMode::B_MODE) {
                 send_to_position_B_X();
-            }
-            else
-            {
+            } else {
                 RCLCPP_WARN(get_logger(), "非矿模式下 X 键无效");
             }
             break;
 
         case KEYCODE_C:
-            if (is_joint_locked_)
-            {
+            if (is_joint_locked_) {
                 RCLCPP_WARN(get_logger(), "关节已锁死，无法移动");
                 break;
             }
-            if (current_special_mode_ == SpecialMode::A_MODE)
-            {
+            if (current_special_mode_ == SpecialMode::A_MODE) {
                 send_to_position_A_C();
-            }
-            else if (current_special_mode_ == SpecialMode::B_MODE)
-            {
-                if (!use_b_grade_frame_)
-                {
+            } else if (current_special_mode_ == SpecialMode::B_MODE) {
+                if (!use_b_grade_frame_) {
                     use_b_grade_frame_ = true;
                     RCLCPP_INFO(get_logger(), "已启用 B 级矿坐标系 (速度控制将基于此坐标系，参考系自动设为 base_link)");
-                }
-                else
-                {
+                } else {
                     RCLCPP_INFO(get_logger(), "B 级矿坐标系已启用，无需重复启用");
                 }
-            }
-            else
-            {
+            } else {
                 RCLCPP_WARN(get_logger(), "非矿模式下 C 键无效");
             }
             break;
@@ -628,10 +533,8 @@ private:
             break;
 
         case KEYCODE_B:
-            if (is_joint_locked_)
-                unlockJoints();
-            else
-                lockCurrentJoints();
+            if (is_joint_locked_) unlockJoints();
+            else lockCurrentJoints();
             break;
 
         case KEYCODE_SPACE:
@@ -643,13 +546,10 @@ private:
             break;
         }
 
-        if (publish_twist)
-        {
-            if (use_b_grade_frame_)
-            {
+        if (publish_twist) {
+            if (use_b_grade_frame_) {
                 // 将速度矢量从 b_grade_frame 旋转到 base_link
-                if (current_mode_ == ControlMode::TRANSLATION)
-                {
+                if (current_mode_ == ControlMode::TRANSLATION) {
                     tf2::Vector3 v(twist_msg->twist.linear.x,
                                    twist_msg->twist.linear.y,
                                    twist_msg->twist.linear.z);
@@ -657,9 +557,7 @@ private:
                     twist_msg->twist.linear.x = v.x();
                     twist_msg->twist.linear.y = v.y();
                     twist_msg->twist.linear.z = v.z();
-                }
-                else
-                {
+                } else {
                     tf2::Vector3 w(twist_msg->twist.angular.x,
                                    twist_msg->twist.angular.y,
                                    twist_msg->twist.angular.z);
@@ -669,9 +567,7 @@ private:
                     twist_msg->twist.angular.z = w.z();
                 }
                 twist_msg->header.frame_id = BASE_FRAME_ID;
-            }
-            else
-            {
+            } else {
                 twist_msg->header.frame_id = frame_to_publish_;
             }
             twist_msg->header.stamp = now();
@@ -680,8 +576,7 @@ private:
     }
 };
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<KeyboardServo>();
     node->keyLoop();
