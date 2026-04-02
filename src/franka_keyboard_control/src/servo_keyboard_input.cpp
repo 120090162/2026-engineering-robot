@@ -555,10 +555,11 @@ namespace ext_serial_driver
             break;
 
         case KEYCODE_B:
-            if (is_joint_locked_)
-                unlockJoints();
-            else
+            if (!is_joint_locked_) {
                 lockCurrentJoints();
+            } else {
+                RCLCPP_INFO(get_logger(), "关节已处于锁死状态，请勿重复操作");
+            }
             break;
 
             // case KEYCODE_SPACE:
