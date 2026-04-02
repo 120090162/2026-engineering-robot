@@ -347,7 +347,8 @@ private:
         puts("  R - 世界坐标系 (base_link)");
         puts("  F - 图像坐标系 (link3)");
         puts("  Z - 开车位置（并退出A/B级矿模式）");
-        puts("  B - 锁死/解锁当前关节角度");
+        puts("  B - 锁死当前关节角度");
+        puts("  V - 解锁当前关节角度");
         puts("  T - 进入A级矿模式");
         puts("  Y - 进入B级矿模式");
         puts("  SPACE - 退出程序");
@@ -358,9 +359,9 @@ private:
         puts("  X - 位置1");
         puts("  C - 启用 B 级矿坐标系 (先绕基座 Y +50°，再绕基座 X +45°)");
         puts("  按 R 或 F 可禁用 B 级矿坐标系，恢复正常控制");
-        puts("\n非矿模式下 X/C/V 无效");
+        puts("\n非矿模式下 X/C 无效");
         puts("\n状态指示:");
-        puts("  关节锁死状态: [按B键切换]");
+        puts("  关节锁死状态: [按B键锁死，按V键解锁]");
         puts("  当前矿模式: 无 / A级 / B级");
         puts("  B级矿坐标系启用状态: 仅 B 级矿模式下可启用, 按C键切换, R/F/切换模式自动禁用");
     }
@@ -528,13 +529,20 @@ private:
             }
             break;
 
-        case KEYCODE_V:
-            RCLCPP_WARN(get_logger(), "V 键已无功能");
+        case KEYCODE_B:
+            if (!is_joint_locked_) {
+                lockCurrentJoints();
+            } else {
+                RCLCPP_INFO(get_logger(), "关节已处于锁死状态，请勿重复操作");
+            }
             break;
 
-        case KEYCODE_B:
-            if (is_joint_locked_) unlockJoints();
-            else lockCurrentJoints();
+        case KEYCODE_V:
+            if (is_joint_locked_) {
+                unlockJoints();
+            } else {
+                RCLCPP_INFO(get_logger(), "关节当前处于自由状态，无需解锁");
+            }
             break;
 
         case KEYCODE_SPACE:

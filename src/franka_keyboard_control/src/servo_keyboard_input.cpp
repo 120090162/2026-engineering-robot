@@ -111,7 +111,7 @@ namespace ext_serial_driver
         {
             try
             {
-                RCLCPP_INFO(get_logger(), "[Receive] receive_header %u!", header[0]);
+                // RCLCPP_INFO(get_logger(), "[Receive] receive_header %u!", header[0]);
                 port_->serial_driver_->port()->receive(header);
                 if (header[0] == 0xA8)
                 {
@@ -126,7 +126,7 @@ namespace ext_serial_driver
                     {
                         // RCLCPP_INFO(get_logger(), "CRC OK!");
                         uint8_t c = packet.key_code;
-                        // RCLCPP_INFO(get_logger(), "[Receive] keycode %u!", c);
+                        RCLCPP_INFO(get_logger(), "[Receive] keycode %u!", c);
                         process_key(c);
                     }
                     else
@@ -553,10 +553,10 @@ namespace ext_serial_driver
                 lockCurrentJoints();
             break;
 
-        case KEYCODE_SPACE:
-            RCLCPP_INFO(get_logger(), "退出程序");
-            rclcpp::shutdown();
-            break;
+        // case KEYCODE_SPACE:
+        //     RCLCPP_INFO(get_logger(), "退出程序");
+        //     rclcpp::shutdown();
+        //     break;
 
         default:
             break;
