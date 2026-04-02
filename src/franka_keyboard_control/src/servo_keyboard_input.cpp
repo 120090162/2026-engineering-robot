@@ -90,7 +90,7 @@ namespace ext_serial_driver
         puts("  C - A级矿兑换位置");
         puts("\nB级矿模式下:");
         puts("  X - 位置1");
-        puts("  C - 启用 B 级矿坐标系 (先绕 Y +30°，再绕新 X +27°)");
+        puts("  C - 启用 B 级矿坐标系 (先绕基座 Y +50°，再绕基座 X +45°)");
         puts("  按 R 或 F 可禁用 B 级矿坐标系，恢复正常控制");
         puts("\n非矿模式下 X/C/V 无效");
         puts("\n状态指示:");
@@ -237,27 +237,20 @@ namespace ext_serial_driver
 
     void KeyboardServo::init_b_grade_rotation()
     {
-        // 先绕 Y 轴旋转 +30°
+        // 1. 绕固定基座 Y 轴旋转 +50°
         tf2::Quaternion q_y;
-        q_y.setRPY(0, 30.0 * M_PI / 180.0, 0);
-        tf2::Transform t_y(q_y, tf2::Vector3(0, 0, 0));
+        q_y.setRPY(0, 50.0 * M_PI / 180.0, 0);
 
-        // 新 X 轴方向（在 base_link 中），即旋转后的 X 轴
-        tf2::Vector3 new_x = t_y * tf2::Vector3(1, 0, 0);
-        new_x.normalize();
+        // 2. 绕固定基座 X 轴（旋转前的 X 轴）旋转 +45°
+        tf2::Quaternion q_x;
+        q_x.setRPY(45.0 * M_PI / 180.0, 0, 0);
 
-        // 绕新 X 轴旋转 +27° 的四元数
-        double angle = 27.0 * M_PI / 180.0;
-        tf2::Quaternion q_local_axis;
-        q_local_axis.setRotation(new_x, angle);
-        q_local_axis.normalize();
-
-        // 总旋转四元数 base_link -> b_grade_frame
-        tf2::Quaternion q_base_to_b = q_y * q_local_axis; // 先应用 q_y，再应用 q_local_axis
+        // 3. 计算合成四元数：外旋左乘
+        tf2::Quaternion q_base_to_b = q_x * q_y;
         q_base_to_b.normalize();
 
-        // 存储逆旋转（b_grade_frame -> base_link）
-        b_grade_rotation_ = q_base_to_b.inverse();
+        // 存储旋转矩阵（b_grade_frame -> base_link）
+        b_grade_rotation_ = q_base_to_b;
     }
 
     void KeyboardServo::publish_b_grade_tf()
@@ -269,16 +262,12 @@ namespace ext_serial_driver
         transform.header.frame_id = BASE_FRAME_ID;
         transform.child_frame_id = "b_grade_frame";
 
-        // 重新计算 q_base_to_b 用于 TF 发布
+        // 重新计算 q_base_to_b 用于 TF 静态广播
         tf2::Quaternion q_y;
-        q_y.setRPY(0, 30.0 * M_PI / 180.0, 0);
-        tf2::Transform t_y(q_y, tf2::Vector3(0, 0, 0));
-        tf2::Vector3 new_x = t_y * tf2::Vector3(1, 0, 0);
-        new_x.normalize();
-        double angle = 27.0 * M_PI / 180.0;
-        tf2::Quaternion q_local_axis;
-        q_local_axis.setRotation(new_x, angle);
-        tf2::Quaternion q_base_to_b = q_y * q_local_axis;
+        q_y.setRPY(0, 50.0 * M_PI / 180.0, 0);
+        tf2::Quaternion q_x;
+        q_x.setRPY(45.0 * M_PI / 180.0, 0, 0);
+        tf2::Quaternion q_base_to_b = q_x * q_y;
         q_base_to_b.normalize();
 
         transform.transform.rotation.x = q_base_to_b.x();
@@ -291,7 +280,7 @@ namespace ext_serial_driver
         transform.transform.translation.z = 0.0;
 
         broadcaster.sendTransform(transform);
-        RCLCPP_INFO(get_logger(), "已发布 B 级矿坐标系静态变换 (先绕 Y +30°，再绕新 X +27°)");
+        RCLCPP_INFO(get_logger(), "已发布 B 级矿坐标系静态变换 (外旋: 先绕基座 Y +50°, 再绕基座 X +45°)");
     }
 
     // ========== A 级矿模式 ==========
@@ -334,7 +323,7 @@ namespace ext_serial_driver
             return;
         }
         RCLCPP_INFO(get_logger(), "B级矿模式 - X位置");
-        send_home_goal({0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0}); // 占位
+        send_home_goal({0.53600, 0.96518, -0.22727, 0.64461, 0.26468, 1.02392, -0.21919}); // 占位
     }
 
     void KeyboardServo::send_to_position_A_Base()
